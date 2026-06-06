@@ -7,7 +7,8 @@ require('dotenv').config();
 
 const app = express();
 app.use(express.json());
-app.use(cors()); // Permite que seu Front-end acesse a API
+app.use(cors({ origin: '*' }));
+ // Permite que seu Front-end acesse a API
 
 // Conexão com o banco Neon (PostgreSQL)
 const pool = new Pool({
