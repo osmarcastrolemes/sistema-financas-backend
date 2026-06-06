@@ -45,7 +45,7 @@ app.post('/api/auth/cadastro', async (req, res) => {
 });
 
 // --- ROTA 2: LOGIN DO USUÁRIO ---
-app.post('/api/auth/login', async (req, res) => {
+app.post('/auth/login', async (req, res) => { ... })
   const { email, senha } = req.body;
 
   try {
