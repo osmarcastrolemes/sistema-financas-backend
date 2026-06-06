@@ -17,7 +17,7 @@ const pool = new Pool({
 });
 
 // --- ROTA 1: CADASTRO DE USUÁRIO ---
-app.post('/api/auth/cadastro', async (req, res) => {
+app.post('/auth/login', async (req, res) => { ... })
   const { nome, email, senha } = req.body;
 
   try {
