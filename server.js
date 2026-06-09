@@ -8,30 +8,26 @@ require('dotenv').config();
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: '*' }));
- // Permite que seu Front-end acesse a API
 
 // Conexão com o banco Neon (PostgreSQL)
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false } // Obrigatório para o Neon
+  ssl: { rejectUnauthorized: false }
 });
 
 // --- ROTA 1: CADASTRO DE USUÁRIO ---
-app.post('/auth/login', async (req, res) => { ... })
+app.post('/auth/cadastro', async (req, res) => {
   const { nome, email, senha } = req.body;
 
   try {
-    // Verifica se o e-mail já existe
     const usuarioExiste = await pool.query('SELECT * FROM usuarios WHERE email = $1', [email]);
     if (usuarioExiste.rows.length > 0) {
       return res.status(400).json({ erro: 'Este e-mail já está cadastrado.' });
     }
 
-    // Criptografa a senha antes de salvar
     const salt = await bcrypt.genSalt(10);
     const senhaCriptografada = await bcrypt.hash(senha, salt);
 
-    // Salva no banco de dados Neon
     const novoUsuario = await pool.query(
       'INSERT INTO usuarios (nome, email, senha) VALUES ($1, $2, $3) RETURNING id, nome, email',
       [nome, email, senhaCriptografada]
@@ -45,11 +41,10 @@ app.post('/auth/login', async (req, res) => { ... })
 });
 
 // --- ROTA 2: LOGIN DO USUÁRIO ---
-app.post('/auth/login', async (req, res) => { ... })
+app.post('/auth/login', async (req, res) => {
   const { email, senha } = req.body;
 
   try {
-    // Busca o usuário pelo e-mail
     const resultado = await pool.query('SELECT * FROM usuarios WHERE email = $1', [email]);
     if (resultado.rows.length === 0) {
       return res.status(400).json({ erro: 'E-mail ou senha incorretos.' });
@@ -57,13 +52,11 @@ app.post('/auth/login', async (req, res) => { ... })
 
     const usuario = resultado.rows[0];
 
-    // Compara a senha digitada com a criptografada do banco
     const senhaValida = await bcrypt.compare(senha, usuario.senha);
     if (!senhaValida) {
       return res.status(400).json({ erro: 'E-mail ou senha incorretos.' });
     }
 
-    // Gera um Token JWT de acesso (válido por 7 dias)
     const token = jwt.sign({ id: usuario.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
     res.json({
@@ -79,7 +72,6 @@ app.post('/auth/login', async (req, res) => { ... })
 
 // --- MIDDLEWARE: VERIFICA SE O USUÁRIO ESTÁ LOGADO ---
 const verificarToken = (req, res, next) => {
-  // Pega o token enviado no cabeçalho (Header) da requisição
   const token = req.header('Authorization')?.replace('Bearer ', '');
 
   if (!token) {
@@ -87,10 +79,9 @@ const verificarToken = (req, res, next) => {
   }
 
   try {
-    // Valida se o token é verdadeiro e não expirou
     const verificado = jwt.verify(token, process.env.JWT_SECRET);
-    req.usuarioLogadoId = verificado.id; // Salva o ID do usuário para usar na rota
-    next(); // Autoriza o usuário a prosseguir para a rota
+    req.usuarioLogadoId = verificado.id;
+    next();
   } catch (error) {
     res.status(400).json({ erro: 'Token inválido ou expirado.' });
   }
@@ -99,7 +90,7 @@ const verificarToken = (req, res, next) => {
 // --- ROTA PROTEGIDA: CADASTRAR UMA RECEITA OU DESPESA ---
 app.post('/api/transacoes', verificarToken, async (req, res) => {
   const { categoria_id, tipo, valor, descricao, data_transacao } = req.body;
-  const usuario_id = req.usuarioLogadoId; // Pega o ID direto do token verificado
+  const usuario_id = req.usuarioLogadoId;
 
   try {
     const novaTransacao = await pool.query(
@@ -121,7 +112,6 @@ app.get('/api/transacoes', verificarToken, async (req, res) => {
   const usuario_id = req.usuarioLogadoId;
 
   try {
-    // Busca as transações trazendo junto os detalhes da categoria via JOIN
     const transacoes = await pool.query(
       `SELECT t.*, c.nome AS categoria_nome, c.icone AS categoria_icone 
        FROM transacoes t
@@ -138,10 +128,61 @@ app.get('/api/transacoes', verificarToken, async (req, res) => {
   }
 });
 
+// --- ROTA PROTEGIDA: BUSCAR UMA TRANSAÇÃO PELO ID ---
+app.get('/api/transacoes/:id', verificarToken, async (req, res) => {
+  const { id } = req.params;
+  const usuario_id = req.usuarioLogadoId;
+
+  try {
+    const resultado = await pool.query(
+      `SELECT t.*, c.nome AS categoria_nome 
+       FROM transacoes t
+       JOIN categorias c ON t.categoria_id = c.id
+       WHERE t.id = $1 AND t.usuario_id = $2`,
+      [id, usuario_id]
+    );
+
+    if (resultado.rows.length === 0) {
+      return res.status(404).json({ erro: 'Lançamento não encontrado ou não pertence a você.' });
+    }
+
+    res.json(resultado.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ erro: 'Erro ao buscar o lançamento.' });
+  }
+});
+
+// --- ROTA PROTEGIDA: ATUALIZAR UMA TRANSAÇÃO ---
+app.put('/api/transacoes/:id', verificarToken, async (req, res) => {
+  const { id } = req.params;
+  const usuario_id = req.usuarioLogadoId;
+  const { categoria_id, tipo, valor, descricao, data_transacao } = req.body;
+
+  try {
+    const resultado = await pool.query(
+      `UPDATE transacoes 
+       SET categoria_id = $1, tipo = $2, valor = $3, descricao = $4, data_transacao = $5
+       WHERE id = $6 AND usuario_id = $7
+       RETURNING *`,
+      [categoria_id, tipo, valor, descricao, data_transacao, id, usuario_id]
+    );
+
+    if (resultado.rowCount === 0) {
+      return res.status(404).json({ erro: 'Lançamento não encontrado ou não pertence a você.' });
+    }
+
+    res.json({ mensagem: 'Lançamento atualizado com sucesso!', transacao: resultado.rows[0] });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ erro: 'Erro ao atualizar o lançamento.' });
+  }
+});
+
 // --- ROTA PROTEGIDA: EXCLUIR UMA TRANSAÇÃO ---
 app.delete('/api/transacoes/:id', verificarToken, async (req, res) => {
   const { id } = req.params;
-  const usuario_id = req.usuarioLogadoId; // Garante que o usuário só apague os próprios gastos
+  const usuario_id = req.usuarioLogadoId;
 
   try {
     const resultado = await pool.query(
@@ -171,6 +212,6 @@ app.get('/api/categorias', verificarToken, async (req, res) => {
   }
 });
 
-// Inicia o servidor localmente
+// Inicia o servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
