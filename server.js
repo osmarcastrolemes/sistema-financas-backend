@@ -32,8 +32,8 @@ const verificarToken = (req, res, next) => {
   }
 };
 
-// --- ROTA 1: CADASTRO DE USUÁRIO (Corrigida sintaxe e endpoint) ---
-app.post('/auth/register', async (req, res) => {
+// --- ROTA 1: CADASTRO DE USUÁRIO (Ajustado para /api/auth/cadastro) ---
+app.post('/api/auth/cadastro', async (req, res) => {
   const { nome, email, senha } = req.body;
 
   try {
@@ -57,8 +57,8 @@ app.post('/auth/register', async (req, res) => {
   }
 });
 
-// --- ROTA 2: LOGIN DO USUÁRIO (Corrigida sintaxe) ---
-app.post('/auth/login', async (req, res) => {
+// --- ROTA 2: LOGIN DO USUÁRIO (Ajustado para /api/auth/login) ---
+app.post('/api/auth/login', async (req, res) => {
   const { email, senha } = req.body;
 
   try {
@@ -128,14 +128,13 @@ app.get('/api/transacoes', verificarToken, async (req, res) => {
   }
 });
 
-// --- ROTA PROTEGIDA: EDIÇÃO DE UMA TRANSAÇÃO (NOVA) ---
+// --- ROTA PROTEGIDA: EDIÇÃO DE UMA TRANSAÇÃO ---
 app.put('/api/transacoes/:id', verificarToken, async (req, res) => {
   const { id } = req.params;
   const { categoria_id, tipo, valor, descricao, data_transacao } = req.body;
   const usuario_id = req.usuarioLogadoId;
 
   try {
-    // 1. Busca a transação atual para garantir que ela pertence ao usuário logado
     const buscaTransacao = await pool.query(
       'SELECT * FROM transacoes WHERE id = $1 AND usuario_id = $2',
       [id, usuario_id]
@@ -147,14 +146,12 @@ app.put('/api/transacoes/:id', verificarToken, async (req, res) => {
 
     const transacaoAtual = buscaTransacao.rows[0];
 
-    // 2. Mescla os valores antigos com os novos informados no body (Fallback)
     const novaCategoria = categoria_id || transacaoAtual.categoria_id;
     const novoTipo = tipo || transacaoAtual.tipo;
     const novoValor = valor !== undefined ? valor : transacaoAtual.valor;
     const novaDescricao = descricao !== undefined ? descricao : transacaoAtual.descricao;
     const novaData = data_transacao || transacaoAtual.data_transacao;
 
-    // 3. Executa a atualização no banco de dados
     const resultado = await pool.query(
       `UPDATE transacoes 
        SET categoria_id = $1, tipo = $2, valor = $3, descricao = $4, data_transacao = $5 
@@ -163,7 +160,7 @@ app.put('/api/transacoes/:id', verificarToken, async (req, res) => {
       [novaCategoria, novoTipo, novoValor, novaDescricao, novaData, id, usuario_id]
     );
 
-    res.json({ mensagem: 'Lançamento atualizado com sucesso!', transacao: resultado.rows[0] });
+    res.json({ mensagem: 'Lançamento updated com sucesso!', transacao: resultado.rows[0] });
   } catch (error) {
     console.error(error);
     res.status(500).json({ erro: 'Erro ao atualizar o lançamento.' });
@@ -203,6 +200,6 @@ app.get('/api/categorias', verificarToken, async (req, res) => {
   }
 });
 
-// Inicia o servidor localmente
+// Inicia o servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
