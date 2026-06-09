@@ -32,7 +32,7 @@ const verificarToken = (req, res, next) => {
   }
 };
 
-// --- ROTA 1: CADASTRO DE USUÁRIO (Ajustado para /api/auth/cadastro) ---
+// --- ROTA 1: CADASTRO DE USUÁRIO ---
 app.post('/api/auth/cadastro', async (req, res) => {
   const { nome, email, senha } = req.body;
 
@@ -57,7 +57,7 @@ app.post('/api/auth/cadastro', async (req, res) => {
   }
 });
 
-// --- ROTA 2: LOGIN DO USUÁRIO (Ajustado para /api/auth/login) ---
+// --- ROTA 2: LOGIN DO USUÁRIO ---
 app.post('/api/auth/login', async (req, res) => {
   const { email, senha } = req.body;
 
@@ -160,10 +160,11 @@ app.put('/api/transacoes/:id', verificarToken, async (req, res) => {
       [novaCategoria, novoTipo, novoValor, novaDescricao, novaData, id, usuario_id]
     );
 
-    res.json({ mensagem: 'Lançamento updated com sucesso!', transacao: resultado.rows[0] });
+    // Ajustado para retornar .rows[0] para entregar o objeto editado correto
+    res.json({ mensagem: 'Lançamento atualizado com sucesso!', transacao: resultado.rows[0] });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ erro: 'Erro ao atualizar o lançamento.' });
+    res.status(500).json({ erro: 'Erro ao atualizar the lançamento.' });
   }
 });
 
